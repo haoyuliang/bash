@@ -1,7 +1,7 @@
 # 
 个人常用脚本收藏-仅供自用
 
-bbr-一键安装最新内核并开启 BBR 脚本
+<a href="/bbr.sh">BBR一键脚本</a>
 
 kms-CentOS，Debian，Ubuntu 一键安装KMS服务脚本
 
