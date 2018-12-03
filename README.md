@@ -3,6 +3,8 @@
 
 <a href="/bbr.sh">BBR一键脚本</a>
 
-kms-CentOS，Debian，Ubuntu 一键安装KMS服务脚本
+<a href="/kms.sh">KMS服务一键脚本</a>
 
-ssrmu-ShadowsocksR 多端口 一键管理脚本
+<a href="/ssrMu.sh">SSR一键脚本</a>
+
+<a href="/l2tp.sh">L2TP一键脚本</a>
