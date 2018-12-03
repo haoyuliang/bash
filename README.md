@@ -8,3 +8,5 @@
 <a href="/ssrMu.sh">SSR一键脚本</a>
 
 <a href="/l2tp.sh">L2TP一键脚本</a>
+
+<a href="/superbench.sh">服务器测试一键脚本</a>
