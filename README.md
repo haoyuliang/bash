@@ -1,40 +1,12 @@
-<?php
+# 
+个人常用脚本收藏-仅供自用
 
-    // Include the DirectoryLister class
-    require_once('resources/DirectoryLister.php');
+<a href="/bbr.sh">BBR一键脚本</a>
 
-    // Initialize the DirectoryLister object
-    $lister = new DirectoryLister();
+<a href="/kms.sh">KMS服务一键脚本</a>
 
-    // Restrict access to current directory
-    ini_set('open_basedir', getcwd());
+<a href="/ssrMu.sh">SSR一键脚本</a>
 
-    if (isset($_GET['zip'])) {
+<a href="/l2tp.sh">L2TP一键脚本</a>
 
-        $dirArray = $lister->zipDirectory($_GET['zip']);
-
-    } else {
-
-        // Initialize the directory array
-        if (isset($_GET['dir'])) {
-            $dirArray = $lister->listDirectory($_GET['dir']);
-        } else {
-            $dirArray = $lister->listDirectory('.');
-        }
-
-        // Define theme path
-        if (!defined('THEMEPATH')) {
-            define('THEMEPATH', $lister->getThemePath());
-        }
-
-        // Set path to theme index
-        $themeIndex = $lister->getThemePath(true) . '/index.php';
-
-        // Initialize the theme
-        if (file_exists($themeIndex)) {
-            include($themeIndex);
-        } else {
-            die('ERROR: Failed to initialize theme');
-        }
-
-    }
+<a href="/superbench.sh">服务器测试一键脚本</a>
