@@ -247,8 +247,8 @@ Set_config_port(){
 	while true
 	do
 	echo -e "请输入要设置的ShadowsocksR账号 端口"
-	read -e -p "(默认: 2333):" ssr_port
-	[[ -z "$ssr_port" ]] && ssr_port="2333"
+	read -e -p "(默认: 90):" ssr_port
+	[[ -z "$ssr_port" ]] && ssr_port="90"
 	echo $((${ssr_port}+0)) &>/dev/null
 	if [[ $? == 0 ]]; then
 		if [[ ${ssr_port} -ge 1 ]] && [[ ${ssr_port} -le 65535 ]]; then
@@ -264,8 +264,8 @@ Set_config_port(){
 }
 Set_config_password(){
 	echo "请输入要设置的ShadowsocksR账号 密码"
-	read -e -p "(默认: doub.io):" ssr_password
-	[[ -z "${ssr_password}" ]] && ssr_password="doub.io"
+	read -e -p "(默认: 1qaz2wsx3edc):" ssr_password
+	[[ -z "${ssr_password}" ]] && ssr_password="1qaz2wsx3edc"
 	echo && echo ${Separator_1} && echo -e "	密码 : ${Green_font_prefix}${ssr_password}${Font_color_suffix}" && echo ${Separator_1} && echo
 }
 Set_config_method(){
@@ -343,8 +343,8 @@ Set_config_protocol(){
  ${Green_font_prefix}5.${Font_color_suffix} auth_chain_a
  ${Green_font_prefix}6.${Font_color_suffix} auth_chain_b
  ${Tip} 如果使用 auth_chain_a 协议，请加密方式选择 none，混淆随意(建议 plain)" && echo
-	read -e -p "(默认: 2. auth_sha1_v4):" ssr_protocol
-	[[ -z "${ssr_protocol}" ]] && ssr_protocol="2"
+	read -e -p "(默认: 3. auth_aes128_md5):" ssr_protocol
+	[[ -z "${ssr_protocol}" ]] && ssr_protocol="3"
 	if [[ ${ssr_protocol} == "1" ]]; then
 		ssr_protocol="origin"
 	elif [[ ${ssr_protocol} == "2" ]]; then
@@ -364,7 +364,7 @@ Set_config_protocol(){
 	if [[ ${ssr_protocol} != "origin" ]]; then
 		if [[ ${ssr_protocol} == "auth_sha1_v4" ]]; then
 			read -e -p "是否设置 协议插件兼容原版(_compatible)？[Y/n]" ssr_protocol_yn
-			[[ -z "${ssr_protocol_yn}" ]] && ssr_protocol_yn="y"
+			[[ -z "${ssr_protocol_yn}" ]] && ssr_protocol_yn="n"
 			[[ $ssr_protocol_yn == [Yy] ]] && ssr_protocol=${ssr_protocol}"_compatible"
 			echo
 		fi
