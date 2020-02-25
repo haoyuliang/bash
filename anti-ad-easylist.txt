@@ -320,7 +320,7 @@
 ||123-counter.de^
 ||123.39jz.com^
 ||12306media.com^
-||123456.asia^
+||16.asia^
 ||12365chia.com^
 ||123advertising.nl^
 ||123compteur.com^
@@ -4759,7 +4759,6 @@
 ||bdjiaoben.wmxa.cn^
 ||bdash-cloud.com^
 ||bdcm.kandianla.com^
-||2345.com^
 ||bdcode.35d1.com^
 ||bdcode.qinglm.com^
 ||bdcode.youke.com^
@@ -29663,7 +29662,6 @@
 ||jebe.xnimg.cn^
 ||jiaoben.xinshipu.cn^
 ||talkingdata.com^
-||jifendownload.2345.cn^
 ||jihehuaban.com^
 ||jihehuaban.com.cn^
 ||jimg.jisuoping.com^
