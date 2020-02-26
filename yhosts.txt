@@ -1270,12 +1270,6 @@
 127.0.0.1 log.ttjx.tatagou.com.cn
 127.0.0.1 ttg.cdn.suanzi.cn
 127.0.0.1 s.youzhuanhua.com
-@errorpage/daohang
-127.0.0.1 www.2345.com
-127.0.0.1 www.hao123.com
-127.0.0.1 m.hao123.com
-127.0.0.1 vs12.bj.u3.ucweb.com
-127.0.0.1 yeah.qq.com
 @errorpage/sns
 127.0.0.1 www.saxmcu.cn
 127.0.0.1 ndyjs.xjtu.edu.cn
@@ -1312,10 +1306,7 @@
 127.0.0.1 tantanapp.com
 @down
 #down-2345
-127.0.0.1 dl.2345.com
-127.0.0.1 download.2345.com
 127.0.0.1 g.wan.2345.com
-127.0.0.1 jifendownload.2345.cn
 127.0.0.1 minipage.2345.com
 127.0.0.1 update.minipage.2345.com
 127.0.0.1 conf.xiniuz.com
@@ -1326,7 +1317,6 @@
 127.0.0.1 inst.360safe.com
 127.0.0.1 pdown.stat.360safe.com
 127.0.0.1 update.360safe.com
-127.0.0.1 down.360.cn
 #down-baidu/hao123
 127.0.0.1 update.123juzi.net
 #down-jiedaibao
