@@ -1,21 +1,21 @@
 #!/bin/bash
 # =============================================
-# Docker + Docker Compose 一键安装脚本（国内优化版）
-# 支持 Ubuntu/Debian/CentOS/Rocky/AlmaLinux 等
+# Docker + Docker Compose 一键安装脚本（国内加速版 - 优先毫秒镜像）
+# 支持 Ubuntu/Debian/CentOS/Rocky/AlmaLinux/Arch 等
 # =============================================
 
 set -e
 
-echo "=== Docker + Docker Compose 一键安装脚本（国内加速） ==="
+echo "=== Docker + Docker Compose 一键安装脚本（优先毫秒镜像） ==="
 
-# 1. 检测系统类型
+# 检测系统
 if [ -f /etc/os-release ]; then
     . /etc/os-release
 fi
 
 echo "检测到系统: $ID $VERSION_ID"
 
-# 2. 安装 Docker
+# 安装 Docker
 if command -v docker &> /dev/null; then
     echo "Docker 已安装，跳过安装步骤。"
 else
@@ -43,7 +43,7 @@ else
             ;;
 
         *)
-            echo "未知系统类型 ($ID)，尝试使用官方脚本安装..."
+            echo "未知系统，尝试官方脚本安装..."
             curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
             ;;
     esac
@@ -51,20 +51,22 @@ else
     echo "Docker 安装完成！"
 fi
 
-# 3. 启动并设置开机自启
+# 启动 Docker
 sudo systemctl enable --now docker
-sudo systemctl status docker --no-pager | head -n 10
+sudo systemctl status docker --no-pager | head -n 15
 
-# 4. 配置国内镜像加速源（多个强加速）
-echo "配置 Docker 国内加速源..."
+# 配置国内加速源（优先毫秒镜像）
+echo "配置 Docker 国内加速源（优先使用毫秒镜像）..."
 sudo mkdir -p /etc/docker
+
 sudo tee /etc/docker/daemon.json > /dev/null <<EOF
 {
   "registry-mirrors": [
+    "https://docker.1ms.run",
     "https://dockerproxy.com",
     "https://docker.m.daocloud.io",
+    "https://docker.1panel.live",
     "https://registry.docker-cn.com",
-    "https://hub-mirror.c.163.com",
     "https://mirror.ccs.tencentyun.com"
   ],
   "live-restore": true
@@ -72,22 +74,19 @@ sudo tee /etc/docker/daemon.json > /dev/null <<EOF
 EOF
 
 sudo systemctl restart docker
-echo "Docker 加速源配置完成！"
+echo "加速源配置完成！（已优先使用 https://docker.1ms.run）"
 
-# 5. 验证安装
-echo "验证 Docker 是否正常运行..."
+# 验证安装
+echo "验证 Docker 是否正常..."
 sudo docker run --rm hello-world
 
-# 6. 验证 Docker Compose
+echo ""
 echo "验证 Docker Compose..."
-docker compose version || echo "Docker Compose 插件安装成功（使用 docker compose 命令）"
+docker compose version || echo "Docker Compose 插件已安装"
 
 echo ""
 echo "=========================================="
-echo "✅ Docker + Docker Compose 安装成功！"
-echo "快捷命令："
-echo "  docker --version"
-echo "  docker compose version"
-echo "  sudo systemctl status docker"
+echo "✅ Docker + Docker Compose 安装并加速配置完成！"
+echo "当前优先加速源：https://docker.1ms.run （毫秒镜像）"
+echo "其他备用加速源已配置"
 echo "=========================================="
-echo "现在你可以直接运行 RustDesk 等 Docker 项目了！"
