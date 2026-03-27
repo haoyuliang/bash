@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# =================================================
+# RustDesk Server (S6版) 管理脚本 - 稳定版
+# =================================================
+
 # 基础配置
 BASE_DATA_DIR="/data/rustdesk-server"
 WORK_DIR="$BASE_DATA_DIR"
@@ -9,7 +13,6 @@ API_DATA_DIR="$BASE_DATA_DIR/api"
 PWD_FILE="$WORK_DIR/admin_password.txt"
 UNIT_NAME="rustdesk-server"
 OFFICIAL_IMAGE="lejianwen/rustdesk-server-s6:latest"
-SHORTCUT_PATH="/usr/local/bin/rustdesk"
 
 # 镜像加速列表
 MIRROR_IMAGES=(
@@ -58,6 +61,7 @@ view_and_manage() {
             PUB_KEY_FILE="$SERVER_DATA_DIR/id_ed25519.pub"
             echo -e "  服务器地址 : $current_ip"
             echo -e "  API管理地址: http://$current_ip:21114"
+            echo -e "  管理用户名 : \033[1;33madmin\033[0m"
             [ -f "$PWD_FILE" ] && echo -e "  管理密码   : \033[1;33m$(cat "$PWD_FILE")\033[0m"
             [ -f "$PUB_KEY_FILE" ] && echo -e "  服务器公钥 : \033[32m$(cat "$PUB_KEY_FILE")\033[0m"
         fi
@@ -104,14 +108,14 @@ view_and_manage() {
     done
 }
 
-# 2. 安装/更新服务 (新增智能探测逻辑)
+# 2. 安装/更新服务 (探测逻辑最长20秒)
 install_server() {
     clear
     echo "================================================="
     echo "              安装/更新 RustDesk Server"
     echo "================================================="
     AUTO_IP=$(get_public_ip)
-    read -e -p "请输入服务器域名或IP [默认: $AUTO_IP]: " server_addr
+    read -e -p "请输入服务器域名 or IP [默认: $AUTO_IP]: " server_addr
     server_addr=${server_addr:-$AUTO_IP}
 
     read -e -p "1. 强制加密连接 (1:加密 0:不加密) [默认: 1]: " env_encrypt
@@ -175,11 +179,10 @@ EOF
 
     echo "启动中..."
     if d_compose up -d; then
-        # --- 核心修改：智能探测密码 ---
+        # --- 智能探测密码 (最长20秒) ---
         EXTRACTED=""
         echo -n "正在初始化系统，探测初始配置..."
-        for i in {1..30}; do
-            # 尝试抓取日志中的密码
+        for i in {1..20}; do
             EXTRACTED=$(docker logs $UNIT_NAME 2>&1 | grep "Admin Password Is:" | tail -n 1 | sed 's/.*Admin Password Is: \([A-Za-z0-9]*\).*/\1/')
             
             if [ -n "$EXTRACTED" ]; then
@@ -188,12 +191,11 @@ EOF
                 break
             fi
             
-            echo -ne "\r正在初始化系统，探测初始配置... [已用时 ${i}s / 最长等待 30s]"
+            echo -ne "\r正在初始化系统，探测初始配置... [已用时 ${i}s / 最长等待 20s]"
             sleep 1
         done
         echo -e "\r系统状态确认完成！                                     "
         
-        # 如果循环结束仍无密码，则尝试保底逻辑
         if [ -z "$EXTRACTED" ]; then
             if [ -f "$PWD_FILE" ]; then
                 echo -e "\033[33m未探测到新密码，检测到旧数据，将沿用本地记录密码。\033[0m"
@@ -202,9 +204,7 @@ EOF
             fi
         fi
 
-        # 自动注册快捷命令
         chmod +x "$0"
-        ln -sf "$(realpath "$0")" "$SHORTCUT_PATH"
 
         clear
         echo -e "\033[1;32m#################################################"
@@ -229,7 +229,6 @@ EOF
         echo "================================================="
         [ -f "$PUB_KEY_FILE" ] && echo -e "\033[1;37m服务器公钥 : \033[32m$(cat "$PUB_KEY_FILE")\033[0m"
         echo ""
-        echo -e "\033[1;35m提示：现在可以直接输入 'rustdesk' 快速调用本管理菜单。\033[0m"
         echo -e "\033[1;32m#################################################\033[0m"
         echo ""
         read -n 1 -s -r -p "配置已完成。按 [任意键] 返回主菜单..."
@@ -241,8 +240,8 @@ uninstall_server() {
     read -e -r -p "确定卸载吗？核心数据将保留 (y/N): " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         d_compose down --rmi all
-        rm -f "$COMPOSE_FILE" "$SHORTCUT_PATH"
-        echo "卸载完成，保留了数据目录及密码记录。"
+        rm -f "$COMPOSE_FILE"
+        echo "卸载完成，数据目录及密码记录已保留。"
         read -n 1 -s -r -p "按任意键返回..."
     fi
 }
