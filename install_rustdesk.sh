@@ -9,6 +9,7 @@ API_DATA_DIR="$BASE_DATA_DIR/api"
 PWD_FILE="$WORK_DIR/admin_password.txt"
 UNIT_NAME="rustdesk-server"
 OFFICIAL_IMAGE="lejianwen/rustdesk-server-s6:latest"
+SHORTCUT_PATH="/usr/local/bin/rustdesk"
 
 # 镜像加速列表
 MIRROR_IMAGES=(
@@ -33,7 +34,7 @@ get_public_ip() {
     echo "$ip" | tr -d '\n' | tr -d ' '
 }
 
-# 1. 核心功能：状态管理与中控面板 (集成密码重置)
+# 1. 核心功能：状态管理与中控面板
 view_and_manage() {
     while true; do
         clear
@@ -57,7 +58,7 @@ view_and_manage() {
             PUB_KEY_FILE="$SERVER_DATA_DIR/id_ed25519.pub"
             echo -e "  服务器地址 : $current_ip"
             echo -e "  API管理地址: http://$current_ip:21114"
-            [ -f "$PWD_FILE" ] && echo -e "  默认管理密码: \033[1;33m$(cat "$PWD_FILE")\033[0m"
+            [ -f "$PWD_FILE" ] && echo -e "  管理密码   : \033[1;33m$(cat "$PWD_FILE")\033[0m"
             [ -f "$PUB_KEY_FILE" ] && echo -e "  服务器公钥 : \033[32m$(cat "$PUB_KEY_FILE")\033[0m"
         fi
         
@@ -65,7 +66,7 @@ view_and_manage() {
         echo "  1. 重启服务 (Restart)"
         echo "  2. 启动服务 (Start)"
         echo "  3. 停止服务 (Stop)"
-        echo "  4. 修改密码 (Change Password) [新增]"
+        echo "  4. 修改密码 (Change Password)"
         echo "  0. 返回上一级 (或直接按回车)"
         echo "-------------------------------------------------"
         read -e -r -p "请选择操作: " op
@@ -83,10 +84,8 @@ view_and_manage() {
                     read -e -p "请输入新的管理密码: " new_pwd
                     if [ -n "$new_pwd" ]; then
                         echo "正在容器内执行修改..."
-                        # 执行用户提供的修改密码命令
                         docker exec -it "$UNIT_NAME" /app/apimain reset-admin-pwd "$new_pwd" >/dev/null 2>&1
                         if [ $? -eq 0 ]; then
-                            # 同步更新本地文件以保持显示一致
                             echo "$new_pwd" > "$PWD_FILE"
                             echo -e "\033[32m密码修改成功，本地记录已同步。\033[0m"
                         else
@@ -105,7 +104,7 @@ view_and_manage() {
     done
 }
 
-# 2. 安装/更新服务 (包含固定环境变量)
+# 2. 安装/更新服务 (新增智能探测逻辑)
 install_server() {
     clear
     echo "================================================="
@@ -176,16 +175,37 @@ EOF
 
     echo "启动中..."
     if d_compose up -d; then
-        echo -n "正在初始化系统，请稍候..."
-        for i in {30..1}; do
-            echo -ne "\r正在初始化系统，请稍候... [剩余 $i 秒] "
+        # --- 核心修改：智能探测密码 ---
+        EXTRACTED=""
+        echo -n "正在初始化系统，探测初始配置..."
+        for i in {1..30}; do
+            # 尝试抓取日志中的密码
+            EXTRACTED=$(docker logs $UNIT_NAME 2>&1 | grep "Admin Password Is:" | tail -n 1 | sed 's/.*Admin Password Is: \([A-Za-z0-9]*\).*/\1/')
+            
+            if [ -n "$EXTRACTED" ]; then
+                echo -e "\n\033[32m探测成功！已获取新初始密码。\033[0m"
+                echo "$EXTRACTED" > "$PWD_FILE"
+                break
+            fi
+            
+            echo -ne "\r正在初始化系统，探测初始配置... [已用时 ${i}s / 最长等待 30s]"
             sleep 1
         done
-        echo -e "\r系统初始化完成！                         "
+        echo -e "\r系统状态确认完成！                                     "
         
-        EXTRACTED=$(docker logs $UNIT_NAME 2>&1 | grep "Admin Password Is:" | tail -n 1 | sed 's/.*Admin Password Is: \([A-Za-z0-9]*\).*/\1/')
-        [ -n "$EXTRACTED" ] && echo "$EXTRACTED" > "$PWD_FILE"
-        
+        # 如果循环结束仍无密码，则尝试保底逻辑
+        if [ -z "$EXTRACTED" ]; then
+            if [ -f "$PWD_FILE" ]; then
+                echo -e "\033[33m未探测到新密码，检测到旧数据，将沿用本地记录密码。\033[0m"
+            else
+                echo -e "\033[31m警告：未探测到初始密码且无本地记录，请稍后手动重置。\033[0m"
+            fi
+        fi
+
+        # 自动注册快捷命令
+        chmod +x "$0"
+        ln -sf "$(realpath "$0")" "$SHORTCUT_PATH"
+
         clear
         echo -e "\033[1;32m#################################################"
         echo "             RUSTDESK 安装部署成功！"
@@ -199,10 +219,17 @@ EOF
         echo -e "\033[1;37mAPI管理地址: \033[1;36mhttp://$current_ip:21114\033[0m"
         echo "================================================="
         echo -e "\033[1;37m管理用户名 : \033[1;33madmin\033[0m"
-        [ -f "$PWD_FILE" ] && echo -e "\033[1;37m默认密码   : \033[1;33m$(cat "$PWD_FILE")\033[0m"
+        
+        if [ -f "$PWD_FILE" ]; then
+            echo -e "\033[1;37m管理密码   : \033[1;33m$(cat "$PWD_FILE")\033[0m"
+        else
+            echo -e "\033[1;37m管理密码   : \033[31m未能获取，请通过选项4手动重置\033[0m"
+        fi
+        
         echo "================================================="
         [ -f "$PUB_KEY_FILE" ] && echo -e "\033[1;37m服务器公钥 : \033[32m$(cat "$PUB_KEY_FILE")\033[0m"
         echo ""
+        echo -e "\033[1;35m提示：现在可以直接输入 'rustdesk' 快速调用本管理菜单。\033[0m"
         echo -e "\033[1;32m#################################################\033[0m"
         echo ""
         read -n 1 -s -r -p "配置已完成。按 [任意键] 返回主菜单..."
@@ -214,8 +241,8 @@ uninstall_server() {
     read -e -r -p "确定卸载吗？核心数据将保留 (y/N): " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         d_compose down --rmi all
-        rm -f "$COMPOSE_FILE" "$PWD_FILE"
-        echo "卸载完成。"
+        rm -f "$COMPOSE_FILE" "$SHORTCUT_PATH"
+        echo "卸载完成，保留了数据目录及密码记录。"
         read -n 1 -s -r -p "按任意键返回..."
     fi
 }
