@@ -33,7 +33,7 @@ get_public_ip() {
     echo "$ip" | tr -d '\n' | tr -d ' '
 }
 
-# 1. 状态管理与信息查看
+# 1. 核心功能：状态管理与中控面板 (集成密码重置)
 view_and_manage() {
     while true; do
         clear
@@ -65,6 +65,7 @@ view_and_manage() {
         echo "  1. 重启服务 (Restart)"
         echo "  2. 启动服务 (Start)"
         echo "  3. 停止服务 (Stop)"
+        echo "  4. 修改密码 (Change Password) [新增]"
         echo "  0. 返回上一级 (或直接按回车)"
         echo "-------------------------------------------------"
         read -e -r -p "请选择操作: " op
@@ -73,13 +74,38 @@ view_and_manage() {
             1) echo "正在重启..."; d_compose restart ;;
             2) echo "正在启动..."; d_compose up -d ;;
             3) echo "正在停止..."; d_compose stop ;;
+            4) 
+                if [ "$status" != "running" ]; then
+                    echo -e "\033[31m错误：必须先启动服务才能修改密码。\033[0m"
+                    sleep 2
+                else
+                    echo -e "\n================================================="
+                    read -e -p "请输入新的管理密码: " new_pwd
+                    if [ -n "$new_pwd" ]; then
+                        echo "正在容器内执行修改..."
+                        # 执行用户提供的修改密码命令
+                        docker exec -it "$UNIT_NAME" /app/apimain reset-admin-pwd "$new_pwd" >/dev/null 2>&1
+                        if [ $? -eq 0 ]; then
+                            # 同步更新本地文件以保持显示一致
+                            echo "$new_pwd" > "$PWD_FILE"
+                            echo -e "\033[32m密码修改成功，本地记录已同步。\033[0m"
+                        else
+                            echo -e "\033[31m执行失败，请检查容器内部环境。\033[0m"
+                        fi
+                    else
+                        echo "输入为空，取消操作。"
+                    fi
+                    echo "================================================="
+                    sleep 2
+                fi
+                ;;
             0|"") break ;;
             *) echo -e "\033[31m无效输入\033[0m"; sleep 1 ;;
         esac
     done
 }
 
-# 2. 安装/更新服务
+# 2. 安装/更新服务 (包含固定环境变量)
 install_server() {
     clear
     echo "================================================="
@@ -150,7 +176,6 @@ EOF
 
     echo "启动中..."
     if d_compose up -d; then
-        # 核心修改：增加 30 秒倒计时，适配低配服务器
         echo -n "正在初始化系统，请稍候..."
         for i in {30..1}; do
             echo -ne "\r正在初始化系统，请稍候... [剩余 $i 秒] "
@@ -180,7 +205,7 @@ EOF
         echo ""
         echo -e "\033[1;32m#################################################\033[0m"
         echo ""
-        read -n 1 -s -r -p "配置已完成。请记录以上信息，按 [任意键] 返回主菜单..."
+        read -n 1 -s -r -p "配置已完成。按 [任意键] 返回主菜单..."
     fi
 }
 
@@ -201,7 +226,7 @@ while true; do
     echo "================================================="
     echo "      RustDesk Server (S6版) 管理脚本"
     echo "================================================="
-    echo "  1. 查看信息 & 状态管理 (重启/启动/停止)"
+    echo "  1. 查看信息 & 状态管理 (重启/启动/停止/密码重置)"
     echo "  2. 安装/更新 RustDesk Server"
     echo "  3. 卸载 RustDesk Server"
     echo "  0. 退出脚本"
