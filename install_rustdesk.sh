@@ -38,20 +38,27 @@ view_and_manage() {
     while true; do
         clear
         local current_ip=$(get_public_ip)
-        local status=$(docker inspect -f '{{.State.Status}}' $UNIT_NAME 2>/dev/null || echo "未安装/未创建")
+        local container_id=$(docker ps -a -q --filter "name=$UNIT_NAME" | head -c 12)
+        local status=$(docker inspect -f '{{.State.Status}}' $UNIT_NAME 2>/dev/null || echo "未安装")
         
         echo "================================================="
         echo "              RustDesk 服务管理中控"
         echo "================================================="
-        echo "  当前容器状态 : [ $status ]"
+        echo -e "  容器名称 : \033[1;32m$UNIT_NAME\033[0m"
+        echo -e "  容器 ID  : \033[1;32m${container_id:-N/A}\033[0m"
+        echo -e "  运行状态 : [ \033[1;33m$status\033[0m ]"
+        echo "-------------------------------------------------"
+        echo -e "  配置目录 : \033[36m$WORK_DIR\033[0m"
+        echo -e "  数据挂载 : \033[36m$SERVER_DATA_DIR -> /data\033[0m"
+        echo -e "  API 挂载 : \033[36m$API_DATA_DIR -> /app/data\033[0m"
+        echo "-------------------------------------------------"
         
         if [ "$status" == "running" ]; then
             PUB_KEY_FILE="$SERVER_DATA_DIR/id_ed25519.pub"
-            echo -e "\033[1;36m服务器地址 : $current_ip\033[0m"
-            echo -e "\033[1;36mAPI管理地址: http://$current_ip:21114\033[0m"
-            [ -f "$PWD_FILE" ] && echo -e "\033[1;33m管理用户名 : admin\033[0m"
-            [ -f "$PWD_FILE" ] && echo -e "\033[1;33m默认密码   : $(cat "$PWD_FILE")\033[0m"
-            [ -f "$PUB_KEY_FILE" ] && echo -e "\033[32m服务器公钥 : $(cat "$PUB_KEY_FILE")\033[0m"
+            echo -e "  服务器地址 : $current_ip"
+            echo -e "  API管理地址: http://$current_ip:21114"
+            [ -f "$PWD_FILE" ] && echo -e "  默认管理密码: \033[1;33m$(cat "$PWD_FILE")\033[0m"
+            [ -f "$PUB_KEY_FILE" ] && echo -e "  服务器公钥 : \033[32m$(cat "$PUB_KEY_FILE")\033[0m"
         fi
         
         echo "-------------------------------------------------"
@@ -60,14 +67,14 @@ view_and_manage() {
         echo "  3. 停止服务 (Stop)"
         echo "  0. 返回上一级 (或直接按回车)"
         echo "-------------------------------------------------"
-        read -p "请选择操作: " op
+        read -e -r -p "请选择操作: " op
         
         case "$op" in
             1) echo "正在重启..."; d_compose restart ;;
             2) echo "正在启动..."; d_compose up -d ;;
             3) echo "正在停止..."; d_compose stop ;;
             0|"") break ;;
-            *) echo "无效选择"; sleep 1 ;;
+            *) echo -e "\033[31m无效输入\033[0m"; sleep 1 ;;
         esac
     done
 }
@@ -108,6 +115,7 @@ install_server() {
 
     [ "$PULL_SUCCESS" = false ] && { echo "拉取失败"; read -n 1 -s -r -p "按任意键返回..."; return; }
 
+    # 写入 docker-compose.yml，包含你要求的固定环境变量
     cat <<EOF > "$COMPOSE_FILE"
 services:
   $UNIT_NAME:
@@ -133,6 +141,7 @@ services:
       - SINGLE_BANDWIDTH=$env_single_bw
       - LIMIT_SPEED=$env_limit_speed
       - RUSTDESK_API_APP_WEB_CLIENT=$env_web_client
+      - RUSTDESK_API_ADMIN_HELLO=RustDesk Api
       - RELAY=$server_addr:21117
       - RUSTDESK_API_RUSTDESK_ID_SERVER=$server_addr:21116
       - RUSTDESK_API_RUSTDESK_RELAY_SERVER=$server_addr:21117
@@ -155,7 +164,6 @@ EOF
         local current_ip=$(get_public_ip)
         PUB_KEY_FILE="$SERVER_DATA_DIR/id_ed25519.pub"
         
-        # 按照用户要求的顺序排列
         echo -e "\033[1;37m服务器地址 : \033[1;36m$current_ip\033[0m"
         echo "================================================="
         echo -e "\033[1;37mAPI管理地址: \033[1;36mhttp://$current_ip:21114\033[0m"
@@ -164,7 +172,6 @@ EOF
         [ -f "$PWD_FILE" ] && echo -e "\033[1;37m默认密码   : \033[1;33m$(cat "$PWD_FILE")\033[0m"
         echo "================================================="
         [ -f "$PUB_KEY_FILE" ] && echo -e "\033[1;37m服务器公钥 : \033[32m$(cat "$PUB_KEY_FILE")\033[0m"
-        
         echo ""
         echo -e "\033[1;32m#################################################\033[0m"
         echo ""
@@ -174,7 +181,7 @@ EOF
 
 # 3. 卸载
 uninstall_server() {
-    read -p "确定卸载吗？核心数据将保留 (y/N): " confirm
+    read -e -r -p "确定卸载吗？核心数据将保留 (y/N): " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         d_compose down --rmi all
         rm -f "$COMPOSE_FILE" "$PWD_FILE"
@@ -194,12 +201,12 @@ while true; do
     echo "  3. 卸载 RustDesk Server"
     echo "  0. 退出脚本"
     echo "================================================="
-    read -p "请输入选项: " choice
+    read -e -r -p "请输入选项: " choice
     case "$choice" in
         1) view_and_manage ;;
         2) install_server ;;
         3) uninstall_server ;;
         0) exit 0 ;;
-        *) echo "无效选项"; sleep 1 ;;
+        *) echo -e "\033[31m输入错误\033[0m"; sleep 1 ;;
     esac
 done
