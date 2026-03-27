@@ -115,7 +115,6 @@ install_server() {
 
     [ "$PULL_SUCCESS" = false ] && { echo "拉取失败"; read -n 1 -s -r -p "按任意键返回..."; return; }
 
-    # 写入 docker-compose.yml，包含你要求的固定环境变量
     cat <<EOF > "$COMPOSE_FILE"
 services:
   $UNIT_NAME:
@@ -151,8 +150,14 @@ EOF
 
     echo "启动中..."
     if d_compose up -d; then
-        echo "等待系统生成配置与密码 (10秒)..."
-        sleep 10
+        # 核心修改：增加 30 秒倒计时，适配低配服务器
+        echo -n "正在初始化系统，请稍候..."
+        for i in {30..1}; do
+            echo -ne "\r正在初始化系统，请稍候... [剩余 $i 秒] "
+            sleep 1
+        done
+        echo -e "\r系统初始化完成！                         "
+        
         EXTRACTED=$(docker logs $UNIT_NAME 2>&1 | grep "Admin Password Is:" | tail -n 1 | sed 's/.*Admin Password Is: \([A-Za-z0-9]*\).*/\1/')
         [ -n "$EXTRACTED" ] && echo "$EXTRACTED" > "$PWD_FILE"
         
