@@ -1,100 +1,73 @@
 #!/bin/bash
-# =============================================
-# Docker + Docker Compose 一键安装脚本
-# 全系统适配 + 自动修复冲突 + 优先毫秒镜像
-# =============================================
 
-set -e
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
 
-echo "=== Docker + Docker Compose 一键安装脚本（全系统适配版） ==="
+echo -e "${GREEN}开始检测系统环境并准备安装 Docker...${NC}"
 
-# ==================== 1. 清理旧 Docker 残留 ====================
-echo "正在清理旧的 Docker 源和密钥..."
-sudo rm -f /etc/apt/sources.list.d/docker*.list
-sudo rm -f /etc/apt/keyrings/docker*.gpg
-sudo rm -f /etc/apt/keyrings/docker.asc
-sudo rm -f /etc/yum.repos.d/docker-ce.repo 2>/dev/null || true
+# 1. 权限检查
+if [ "$EUID" -ne 0 ]; then 
+    echo -e "${RED}请以 root 用户运行或使用 sudo 执行此脚本${NC}"
+    exit 1
+fi
 
-# ==================== 2. 检测系统 ====================
+# 2. 识别系统发行版
 if [ -f /etc/os-release ]; then
     . /etc/os-release
+    OS=$ID
+    VER=$VERSION_ID
 else
-    ID="unknown"
+    echo -e "${RED}无法识别系统版本，请手动安装${NC}"
+    exit 1
 fi
 
-echo "检测到系统: $ID $VERSION_ID"
+echo -e "${YELLOW}检测到系统: $OS $VER${NC}"
 
-# ==================== 3. 安装 Docker ====================
-if command -v docker &> /dev/null; then
-    echo "Docker 已安装，跳过安装步骤。"
-else
-    echo "正在安装 Docker..."
+# 3. 配置阿里云镜像源并安装 Docker
+case $OS in
+    ubuntu|debian|raspbian)
+        apt-get update
+        apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+        curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/$OS/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg --yes
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.aliyun.com/docker-ce/linux/$OS $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        apt-get update
+        apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+        ;;
+    centos|rocky|almalinux|fedora)
+        yum install -y yum-utils
+        yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+        # 如果是 Rocky/Alma 等，自动适配 repo 地址
+        sed -i 's+download.docker.com+mirrors.aliyun.com/docker-ce+g' /etc/yum.repos.d/docker-ce.repo
+        yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+        ;;
+    *)
+        echo -e "${RED}暂不支持的系统类型: $OS${NC}"
+        exit 1
+        ;;
+esac
 
-    case $ID in
-        ubuntu|debian)
-            echo "使用官方源安装（适配 Debian 13）..."
-            sudo apt-get update
-            sudo apt-get install -y ca-certificates curl gnupg lsb-release --fix-broken
-            sudo mkdir -p /etc/apt/keyrings
-            sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-            sudo chmod a+r /etc/apt/keyrings/docker.asc
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            sudo apt-get update
-            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin --fix-broken
-            ;;
+# 4. 启动 Docker 并设置开机自启
+systemctl enable --now docker
 
-        centos|rocky|alma|rhel|fedora)
-            sudo yum install -y yum-utils
-            sudo yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
-            sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-            ;;
-
-        arch|manjaro)
-            sudo pacman -Syu --noconfirm docker docker-compose
-            ;;
-
-        *)
-            echo "未知系统，使用官方通用脚本安装..."
-            curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
-            ;;
-    esac
-
-    echo "Docker 安装完成！"
-fi
-
-# ==================== 4. 启动 Docker ====================
-sudo systemctl enable --now docker 2>/dev/null || true
-sudo systemctl restart docker
-
-# ==================== 5. 配置毫秒镜像加速源 ====================
-echo "正在配置国内加速源（优先毫秒镜像）..."
-sudo mkdir -p /etc/docker
-sudo tee /etc/docker/daemon.json > /dev/null <<EOF
+# 5. 配置 1ms.run 镜像加速源
+echo -e "${YELLOW}正在配置 1ms.run 镜像加速...${NC}"
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<EOF
 {
-  "registry-mirrors": [
-    "https://docker.1ms.run",
-    "https://dockerproxy.com",
-    "https://docker.m.daocloud.io",
-    "https://docker.1panel.live",
-    "https://registry.docker-cn.com"
-  ],
-  "live-restore": true
+  "registry-mirrors": ["https://1ms.run"]
 }
 EOF
-sudo systemctl restart docker
-echo "加速源配置完成！（已优先使用 https://docker.1ms.run）"
 
-# ==================== 6. 验证 ====================
-echo "验证 Docker..."
-sudo docker run --rm hello-world
+# 重启服务使配置生效
+systemctl daemon-reload
+systemctl restart docker
 
-echo ""
-echo "验证 Docker Compose..."
-docker compose version
-
-echo ""
-echo "=========================================="
-echo "✅ Docker + Docker Compose 安装并加速配置成功！"
-echo "当前优先加速源：https://docker.1ms.run （毫秒镜像）"
-echo "现在你可以直接安装 RustDesk 等项目了！"
-echo "=========================================="
+# 6. 验证安装结果
+echo -e "${GREEN}-------------------------------------------${NC}"
+docker --version && echo -e "${GREEN}Docker 安装成功！${NC}"
+docker compose version && echo -e "${GREEN}Docker Compose 安装成功！${NC}"
+echo -e "${YELLOW}当前镜像加速源已设为: https://1ms.run${NC}"
+echo -e "${GREEN}-------------------------------------------${NC}"
