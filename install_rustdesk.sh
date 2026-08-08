@@ -14,20 +14,7 @@ PWD_FILE="$WORK_DIR/admin_password.txt"
 UNIT_NAME="rustdesk-server"
 OFFICIAL_IMAGE="lejianwen/rustdesk-server-s6:latest"
 LOCAL_TAR_NAME="rustdesk-s6.tar" # 预留的本地镜像包名称
-DOCKER_SCRIPT_URL="https://hcloud-1251153962.file.myqcloud.com/bash/install_docker.sh"
-
-# 调整后的指定镜像加速列表
-MIRROR_NAMES=(
-    "华为云加速 (推荐 - 默认)"
-    "毫秒加速"
-    "1Panel加速"
-)
-
-MIRROR_URLS=(
-    "swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/lejianwen/rustdesk-server-s6:latest"
-    "docker.1ms.run/lejianwen/rustdesk-server-s6:latest"
-    "docker.1panel.live/lejianwen/rustdesk-server-s6:latest"
-)
+DOCKER_SCRIPT_URL="https://raw.githubusercontent.com/haoyuliang/bash/refs/heads/main/install_docker.sh"
 
 # 初始化目录
 mkdir -p "$WORK_DIR" "$SERVER_DATA_DIR" "$API_DATA_DIR"
@@ -204,8 +191,8 @@ install_server() {
     # 环境变量配置
     read -e -p "1. 强制加密连接 (1:加密 0:不加密) [默认: 1]: " env_encrypt
     env_encrypt=${env_encrypt:-1}
-    read -e -p "2. 强制登录发起连接 (Y/N) [默认: Y]: " env_login
-    env_login=${env_login:-Y}
+    read -e -p "2. 强制登录发起连接 (Y/N) [默认: N]: " env_login
+    env_login=${env_login:-N}
     read -e -p "3. 总带宽限制 (Mbps) [默认: 1000]: " env_total_bw
     env_total_bw=${env_total_bw:-1000}
     read -e -p "4. 单个连接限速 (Mbps) [默认: 100]: " env_single_bw
@@ -225,38 +212,19 @@ install_server() {
         docker load -i "$WORK_DIR/$LOCAL_TAR_NAME" && PULL_SUCCESS=true
     fi
 
-    # 如果本地无包，进入网络拉取流程
+    # 如果本地无包，直接从 Docker Hub 官方拉取
     if [ "$PULL_SUCCESS" = false ]; then
-        echo -e "\n-------------------------------------------------"
-        echo "请选择要使用的 Docker 镜像拉取源:"
-        echo "  1. ${MIRROR_NAMES[0]}"
-        echo "  2. ${MIRROR_NAMES[1]}"
-        echo "  3. ${MIRROR_NAMES[2]}"
-        echo "-------------------------------------------------"
-        read -e -p "请输入编号 [默认: 1]: " mirror_choice
-        mirror_choice=${mirror_choice:-1}
-
-        # 根据选择定位索引
-        case "$mirror_choice" in
-            1|2|3) idx=$((mirror_choice - 1)) ;;
-            *)     idx=0 ;; # 任何非法输入一律默认回滚到华为云
-        esac
-
-        selected_mirror="${MIRROR_URLS[$idx]}"
-        echo "正在通过选择的加速源拉取镜像: $selected_mirror ..."
-        
-        if docker pull "$selected_mirror"; then
-            docker tag "$selected_mirror" "$OFFICIAL_IMAGE"
-            docker rmi "$selected_mirror"
+        echo "正在从 Docker Hub 官方拉取镜像: $OFFICIAL_IMAGE ..."
+        if docker pull "$OFFICIAL_IMAGE"; then
             PULL_SUCCESS=true
         else
-            echo -e "\033[31m[错误] 所选加速源拉取失败！\033[0m"
+            echo -e "\033[31m[错误] 官方镜像拉取失败！\033[0m"
         fi
     fi
 
     # 终极拦截
     if [ "$PULL_SUCCESS" = false ]; then
-        echo -e "\n\033[31m镜像获取失败！网络连通异常或所选加速站均失效。\033[0m"
+        echo -e "\n\033[31m镜像获取失败！网络连通异常或官方仓库不可达。\033[0m"
         echo -e "请将提前下载好的镜像包重命名为 $LOCAL_TAR_NAME 并上传到脚本同目录后再运行本地安装。"
         read -n 1 -s -r -p "按任意键返回..."
         return
