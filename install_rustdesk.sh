@@ -96,22 +96,6 @@ check_and_install_docker() {
     return 0
 }
 
-# 自动注册系统快捷管理指令快捷方式
-register_shortcut() {
-    local current_script_path
-    current_script_path=$(readlink -f "$0")
-    
-    # 将自身脚本复制保存至数据工作目录，防止临时目录误删
-    if [ "$current_script_path" != "$WORK_DIR/rustdesk.sh" ]; then
-        cp -f "$current_script_path" "$WORK_DIR/rustdesk.sh"
-        chmod +x "$WORK_DIR/rustdesk.sh"
-    fi
-
-    # 建立快捷软链接到系统 PATH 路径中
-    ln -sf "$WORK_DIR/rustdesk.sh" /usr/local/bin/rustdesk
-    chmod +x /usr/local/bin/rustdesk
-}
-
 # 1. 核心功能：状态管理与中控面板
 view_and_manage() {
     while true; do
@@ -258,13 +242,14 @@ install_server() {
         # 根据选择定位索引
         case "$mirror_choice" in
             1|2|3|4) idx=$((mirror_choice - 1)) ;;
-            *)       idx=0 ;;
+            *)       idx=0 ;; # 任何非法输入一律默认回滚到华为云
         esac
 
         selected_mirror="${MIRROR_URLS[$idx]}"
         echo "正在通过选择的拉取源获取镜像: $selected_mirror ..."
         
         if docker pull "$selected_mirror"; then
+            # 只有当使用的拉取源不是官方原站镜像时，才执行重命名与删除标签操作
             if [ "$selected_mirror" != "$OFFICIAL_IMAGE" ]; then
                 docker tag "$selected_mirror" "$OFFICIAL_IMAGE"
                 docker rmi "$selected_mirror"
@@ -336,10 +321,8 @@ EOF
             sleep 1
         done
         echo -e "\r系统状态确认完成！                                       "
-
-        # 注册全局快捷命令
-        register_shortcut
         
+        chmod +x "$0"
         clear
         echo -e "\033[1;32m#################################################"
         echo "               RUSTDESK 安装部署成功！"
@@ -355,8 +338,6 @@ EOF
         echo "================================================="
         [ -f "$PUB_KEY_FILE" ] && echo -e "\033[1;37m服务器公钥 : \033[32m$(cat "$PUB_KEY_FILE")\033[0m"
         echo ""
-        echo -e "\033[1;32m提示: 已为您生成系统全局命令，今后在终端任意位置输入 \033[1;33mrustdesk\033[1;32m 或 \033[1;33mbash rustdesk\033[1;32m 即可直接打开管理面板！\033[0m"
-        echo "================================================="
         read -n 1 -s -r -p "配置已完成。按 [任意键] 返回主菜单..."
     else
         echo -e "\033[31m容器启动失败，请检查 Docker Compose 配置或端口是否被占用。\033[0m"
@@ -371,7 +352,6 @@ uninstall_server() {
         echo "正在清理并卸载容器..."
         d_compose down --rmi all
         rm -f "$COMPOSE_FILE"
-        rm -f /usr/local/bin/rustdesk # 移除系统快捷方式
         
         read -e -r -p "是否保留核心数据目录 ($BASE_DATA_DIR)？(Y/n) [默认: Y]: " keep_data
         keep_data=${keep_data:-Y}
@@ -379,9 +359,9 @@ uninstall_server() {
         if [[ "$keep_data" =~ ^[Nn]$ ]]; then
             echo "正在彻底删除数据目录..."
             rm -rf "$BASE_DATA_DIR"
-            echo "服务已完全卸载，快捷命令与数据目录已彻底清除。"
+            echo "服务已完全卸载，数据目录已彻底清除。"
         else
-            echo "服务已卸载，快捷命令已清除，核心数据目录已妥善保留。"
+            echo "服务已卸载，核心数据目录已妥善保留。"
         fi
         
         read -n 1 -s -r -p "按任意键返回..."
